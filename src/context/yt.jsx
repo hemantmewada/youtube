@@ -10,6 +10,7 @@ export const YTProvider = ({ children }) => {
   const [searchedValue, setSearchedValue] = useState("");
   const [searchedResults, setSearchedResults] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
+  const [mobileMenu, setMobileMenu] = useState(false);
 
   return (
     <YTContext.Provider
@@ -26,6 +27,8 @@ export const YTProvider = ({ children }) => {
         setSearchedResults,
         categoryData,
         setCategoryData,
+        mobileMenu,
+        setMobileMenu,
       }}
     >
       {children}

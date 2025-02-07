@@ -1,170 +1,126 @@
-# Express OIDC Auth Middleware
+# S3 File Upload
 
-A TypeScript-friendly Express middleware for OIDC authentication with role-based access control. Version 2.7.0
+A TypeScript-friendly Node.js library for uploading files to AWS S3 with easy configuration and seamless integration. Version 1.0.0
+
+Features
 
 ## Features
 
-- 🔐 OIDC authentication support
-- 👥 Role-based access control
+- ☁️ Upload files to AWS S3
+- 🔒 Secure file handling with AWS SDK
+- 📦 Supports multiple file types
+- ⚡ Fast and efficient uploads
 - 📝 TypeScript support
-- ⚡ Express.js integration
-- 🔄 Token validation and verification
-- 🎯 Configurable OIDC issuer
-
-## Installation
-
-```bash
-npm install @dapl/oidc-auth-middleware
-```
+- 🌍 Environment-based configuration
 
 ## Usage
 
-### Basic Setup
+### Step 1. Use In Frontend
+
+In your front-end, you just call this API or Lambda and get the URL back then make a simple PUT request to the endpoint you provided.
+
+The payload have to be your actual file not some kind of multipart data.
+
+Here is a simple React component that does this
 
 ```typescript
-import express from "express";
-import { createOIDCAuthMiddleware, Roles } from "@dapl/oidc-auth-middleware";
+import React, { useState } from "react";
 
-const app = express();
+function S3Uploader() {
+  const [file, setFile] = useState(null);
 
-async function setup() {
-  // Initialize OIDC middleware ### Make sure Use the same condition as the one in the example for issuerUri
-  const issuerUri = process.env.OIDC_ISSUER;
-  if (!issuerUri) {
-    throw new Error("OIDC_ISSUER environment variable is required");
-  }
+  const handleUpload = () => {
+    // Get pre-signed URL from backend
+    fetch("/upload", {
+      method: "POST",
+      body: {
+        fileName: file.name,
+        fileType: file.type,
+        folder: "folder-name", // it can be anything like profile, document, ticket etc
+      },
+    })
+      .then((response) => response.json())
+      .then(({ url }) => {
+        // Upload directly to S3
+        return fetch(url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+      })
+      .then(() => alert("File uploaded successfully"))
+      .catch((error) => console.error("Upload failed:", error));
+  };
 
-  const oidcMiddleware = await createOIDCAuthMiddleware({
-    issuerUri: issuerUri,
-  });
-
-  // Apply authentication middleware globally
-  app.use(oidcMiddleware.authenticate);
-
-  // Protected route with role-based access
-  app.get("/admin", oidcMiddleware.requireRoles([Roles.ADMIN]), (req, res) => {
-    res.json({ message: "Admin access granted" });
-  });
-}
-
-setup();
-```
-
-### TypeScript Usage
-
-For TypeScript users, you can use the provided types for better type safety:
-
-```typescript
-import {
-  createOIDCAuthMiddleware,
-  Roles,
-  type AuthenticatedRequest,
-} from "@dapl/oidc-auth-middleware";
-
-app.get(
-  "/profile",
-  oidcMiddleware.requireRoles([Roles.USER]),
-  (req: AuthenticatedRequest, res) => {
-    // req.user is properly typed
-    const username = req.user?.preferred_username;
-    res.json({ username });
-  }
-);
-```
-
-### Available Roles
-
-The following roles are predefined:
-
-```typescript
-const Roles = {
-  ADMIN: "admin",
-  SUPERADMIN: "superadmin",
-  GOVERNANCE: "governance",
-  PRINCIPAL: "principal",
-  SME: "sme",
-  STUDENT: "student",
-  TEACHER: "teacher",
-  DERTEXAM: "dertExam",
-  DERTACADEMIC: "dertAcademic",
-  SUPPORT_EXECUTIVE = "support_executive",
-  OPERATION_EXECUTIVE = "operation_executive",
-  CRC = "crc",
-  BRC = "brc",
-  DISTRICT_ADMIN = "district_admin",
-  STATE_ADMIN = "state_admin",
-};
-```
-
-### RESPONSE OF THE DECODED TOKEN
-
-The following roles are predefined:
-
-```json
-{
-  sub: 'f:7d7b7179-60e4-4d83-99e6-31c6cbb9a984:67a4842d9a317be730cf9ace',
-  preferred_username: '123789456',
-  realm_access: { roles: [ 'admin' ] },
-  role: 'admin',
-  upn: 'ObjectId', #ObjectId Of User In Plain String
-  email: 'xyz@gmail.com',
-  name: 'admin',
-  given_name: 'admin',
-  family_name: ''
+  return (
+    <div>
+      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      <button onClick={handleUpload}>Upload</button>
+    </div>
+  );
 }
 ```
 
-### JavaScript Usage
+This component can be used to upload files to an s3 bucket securely.
 
-For JavaScript users:
+### Step 2. Get Object Securely
 
-```javascript
-const {
-  createOIDCAuthMiddleware,
-  Roles,
-} = require("@dapl/oidc-auth-middleware");
-
-// Initialize middleware
-const oidcMiddleware = await createOIDCAuthMiddleware({
-  issuerUri: "https://your-oidc-issuer.com",
-});
-
-// Protected route
-app.get("/admin", oidcMiddleware.requireRoles([Roles.ADMIN]), (req, res) => {
-  res.json({ message: "Admin access granted" });
-});
-```
-
-## API Reference
-
-### createOIDCAuthMiddleware(config)
-
-Creates an instance of the OIDC middleware.
+Object File can be anything it can be .png, .jpg, .pdf etc
 
 ```typescript
-interface OIDCConfig {
-  issuerUri: string;
+import React, { useEffect, useState } from "react";
+
+function S3Viewer() {
+  const [fileUrl, setFileUrl] = useState("");
+  const [fileType, setFileType] = useState("");
+
+  useEffect(() => {
+    const fetchFileUrl = async () => {
+      try {
+        const response = await fetch("/view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: "example.pdf", // it can be any extension (.pdf, .png, .jpg, .jpeg) etc
+            fileType: "pdf", // File type should be accroding to the fileName for example the given file is example.pdf so fileType should be pdf
+            folder: "folder-name", // it can be anything like profile, document, ticket etc
+          }),
+        });
+
+        const { url } = await response.json();
+        setFileUrl(url);
+        setFileType("application/pdf"); // Replace this dynamically if available in the response
+      } catch (error) {
+        console.error("Failed to get file URL:", error);
+      }
+    };
+
+    fetchFileUrl();
+  }, []);
+
+  return (
+    <div className="p-4">
+      {fileUrl ? (
+        <div className="mt-4">
+          <p>File Preview:</p>
+          {fileType.startsWith("image/") ? (
+            <img src={fileUrl} alt="File Preview" className="max-w-xs" />
+          ) : (
+            <iframe
+              src={fileUrl}
+              title="File Preview"
+              className="w-full h-96 border"
+            ></iframe>
+          )}
+        </div>
+      ) : (
+        <p>Loading file...</p>
+      )}
+    </div>
+  );
 }
 
-const middleware = await createOIDCAuthMiddleware({
-  issuerUri: "https://your-oidc-issuer.com",
-});
-```
-
-### middleware.authenticate
-
-Express middleware for authenticating requests.
-
-```typescript
-app.use(middleware.authenticate);
-```
-
-### middleware.requireRoles(roles)
-
-Express middleware for role-based access control.
-
-```typescript
-app.get("/admin", middleware.requireRoles([Roles.ADMIN, Roles.SUPERADMIN]));
+export default S3Viewer;
 ```
 
 ## Error Handling
